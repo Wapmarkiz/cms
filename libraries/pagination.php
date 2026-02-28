@@ -28,7 +28,7 @@ class CI_Pagination
 {
 
     var $base_url = ''; // The page we are linking to
-    var $total_rows = ''; // Total number of items (database results)
+    var $total_rows = 0; // Total number of items (database results)
     var $per_page = 10; // Max number of items you want shown per page
     var $num_links = 2; // Number of "digit" links to show before/after the currently viewed page
     var $cur_page = 0; // The current page being viewed
@@ -57,10 +57,10 @@ class CI_Pagination
     /**
      * Constructor
      *
-     * @access	public
-     * @param	array	initialization parameters
+     * @access  public
+     * @param   array   initialization parameters
      */
-    function CI_Pagination($params = array())
+    function __construct($params = array()) // FIX #4: Замінено застарілий PHP4-конструктор на __construct()
     {
         if (count($params) > 0) {
             $this->initialize($params);
@@ -74,9 +74,9 @@ class CI_Pagination
     /**
      * Initialize Preferences
      *
-     * @access	public
-     * @param	array	initialization parameters
-     * @return	void
+     * @access  public
+     * @param   array   initialization parameters
+     * @return  void
      */
     function initialize($params = array())
     {
@@ -94,13 +94,16 @@ class CI_Pagination
     /**
      * Generate the pagination links
      *
-     * @access	public
-     * @return	string
+     * @access  public
+     * @return  string
      */
     function create_links()
     {
-        $start = $_GET['start'];
-        $start = is_numeric($_GET['page']) ? $_GET['page'] * $this->per_page - 1 : $start;
+        // FIX #1: Додано перевірку існування ключів $_GET та виправлено логіку offset
+        // FIX #5: Використовуємо окрему змінну $cur_offset щоб не конфліктувати з $start нижче
+        $cur_offset = isset($_GET['start']) ? (int)$_GET['start'] : 0;
+        $cur_offset = isset($_GET['page']) && is_numeric($_GET['page']) ? ((int)$_GET['page'] - 1) * $this->per_page : $cur_offset;
+
         // If our item count or per-page total is zero there is no need to continue.
         if ($this->total_rows == 0 OR $this->per_page == 0) {
             return '';
@@ -114,20 +117,21 @@ class CI_Pagination
             return '';
         }
 
-        $this->cur_page = $start;
+        $this->cur_page = $cur_offset;
+
+        // FIX #3: Перенесено is_numeric() перевірку ДО приведення до int
+        if (!is_numeric($this->cur_page)) {
+            $this->cur_page = 0;
+        }
 
         // Prep the current page - no funny business!
         $this->cur_page = (int) $this->cur_page;
 
-
         $this->num_links = (int) $this->num_links;
 
         if ($this->num_links < 1) {
-            a_error('Your number of links must be a positive number.');
-        }
-
-        if (!is_numeric($this->cur_page)) {
-            $this->cur_page = 0;
+            // FIX #2: Замінено неіснуючу функцію a_error() на trigger_error()
+            trigger_error('Your number of links must be a positive number.', E_USER_ERROR);
         }
 
         // Is the page number beyond the result range?
@@ -136,7 +140,7 @@ class CI_Pagination
             $this->cur_page = ($num_pages - 1) * $this->per_page;
         }
 
-        $uri_page_number = $this->cur_page;
+        // (uri_page_number removed — was declared but never used)
         $this->cur_page = floor(($this->cur_page / $this->per_page) + 1);
 
         // Calculate the start and end numbers. These determine
